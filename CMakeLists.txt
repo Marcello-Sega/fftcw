@@ -5,7 +5,7 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
 PROJECT (FFTCW C) 
 
 FIND_PATH(FFTW_INC_DIR
-          NAMES QtGui
+          NAMES fftw3.h
           PATHS /usr/include
                 $ENV{HOME}/include
                 /usr/local/include
@@ -20,10 +20,12 @@ FIND_PATH(FFTW_INC_DIR
 IF(NOT FFTW_INC_DIR)
    MESSAGE(FATAL_ERROR "Unable to find fftw include files")
 ELSE(NOT FFTW_INC_DIR)
-   MESSAGE(FATAL_ERROR "OK")
+   STRING(REGEX REPLACE "/fftw3.h" "" FFTW_INC_DIR "${FFTW_INC_DIR}")
 ENDIF(NOT FFTW_INC_DIR) 
 
 ADD_DEFINITIONS( -Wall --pedantic -O3 )
 ADD_EXECUTABLE(fftcw fftcw.c)
+TARGET_LINK_LIBRARIES(fftcw fftw3)
+
 
 
