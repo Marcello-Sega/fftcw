@@ -10,7 +10,7 @@
 typedef enum {MEM_ADD,MEM_RESIZE,MEM_REMOVE} mem_operation;
 typedef enum {TYPE_REAL,TYPE_COMPLEX} number_type;
 int memory_usage=0;
-void usage (void);
+void usage (char*);
 void memusage(int amount,char* address,mem_operation op);
 void compute_corr_ft(int nobj, int dim, int window, int nframes, fftw_complex * out, double * autocorr, double * croscorr);
 int suck (int nobj, int dim, int maxframes,  double **buffer,FILE *cid);
@@ -70,10 +70,10 @@ int main(int argc, char ** argv) {
              case 'c': cut= atoi(optarg);      break;
              case 'o': strncpy(filename,optarg,1024); break;
              case 't': timestep=atof(optarg); i++; break;
-             case 'h': case '?': default: usage ();
+             case 'h': case '?': default: usage (argv[0]);
         }
     }
-    if(i<3) usage();
+    if(i<3) usage(argv[0]);
     if(nfiles==0) { nfiles=1; sprintf(infilenames[0],"-"); }  
     for(i=0;i<nfiles;i++){
          if(in!=NULL) {
@@ -179,7 +179,7 @@ int main(int argc, char ** argv) {
     return 1;
 } 
 
-void usage (void){ exit(printf( "Usage : spectrum -t <timestep> -n <n_objects> -d <dimension>  [ -w <window> ] [ -f <nframes> ] [ -o <output> ] [ -m <maxframes> ] [ -c <spectrum_input_cut> ] [ -T <inputfile> [ <inputfile2> [...] ] ] [ -F <spectrum_output_cut> ] [ -R <correlation_output_cut> ] [ -h ]\nNote: you can supply a command through which to pipe your data before processing them using the EXT_COMM variable\n e.g. EXT_COMM=\"/usr/bin/awk \'{print \\$1}\'\"\n"  ));}
+void usage (char *arg){ exit(printf( "Usage : %s -t <timestep> -n <n_objects> -d <dimension>  [ -w <window> ] [ -f <nframes> ] [ -o <output> ] [ -m <maxframes> ] [ -c <spectrum_input_cut> ] [ -T <inputfile> [ <inputfile2> [...] ] ] [ -F <spectrum_output_cut> ] [ -R <correlation_output_cut> ] [ -h ]\nNote: you can supply a command through which to pipe your data before processing them using the EXT_COMM variable\n e.g. EXT_COMM=\"/usr/bin/awk \'{print \\$1}\'\"\n",arg  ));}
 
 void memusage(int amount,char * address,mem_operation op){
 #if DEBUG_LEVEL <=-1
