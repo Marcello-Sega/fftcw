@@ -76,7 +76,7 @@ int main(int argc, char ** argv) {
     }
     if(i<3) usage(argv[0]);
     if(nfiles==0) { nfiles=1; sprintf(infilenames[0],"-"); }  
-    if(nthreads>1){
+    if(nthreads>=1){
 #ifdef _USE_THREADS
 	fprintf(stderr,"Using %d threads\n",nthreads);
 #else
