@@ -16,7 +16,7 @@ void compute_corr_ft(int nobj, int dim, int window, int nframes, fftw_complex * 
 int suck (int nobj, int dim, int maxframes,  double **buffer,FILE *cid);
 int do_fft(int nobj, int dim, int window, int nframes, int totframes, double ** buffer,double ** autocorr, double ** croscorr, int nthreads );
 void do_spectrum(int nobj, int dim, int window, int nframes, int cut, double * in, fftw_complex ** out);
-void do_back_fft(int nobj, int dim, int window, int nframes, int nfiles, double ** autocorr, double ** croscorr, double ** p_autocorr_direct, double ** p_croscorr_direct);
+void do_back_fft(int nobj, int dim, int window, int nframes, int nfiles, double ** autocorr, double ** croscorr, double ** p_autocorr_direct, double ** p_croscorr_direct, int nthreads);
 int output (int nobj, int window, int nframes, double dt, void * ac_dir, void * cc_dir, FILE*outfile, number_type type,int RSpaceOutputCut,int KSpaceOutputCut);
 
 int main(int argc, char ** argv) { 
@@ -87,7 +87,7 @@ int main(int argc, char ** argv) {
 	exit(printf("Error: the number of threads must be >=1\n"));
     }
 #ifdef _USE_THREADS
-    fftw_init_threads(void);
+    fftw_init_threads();
 #endif
 
     for(i=0;i<nfiles;i++){
@@ -152,7 +152,7 @@ int main(int argc, char ** argv) {
     }
     
     fprintf(stderr,"Performing bck FFTs\n");
-    do_back_fft(nobj, dim, window, nframes, nfiles, &autocorr, &croscorr, &autocorr_direct, &croscorr_direct);
+    do_back_fft(nobj, dim, window, nframes, nfiles, &autocorr, &croscorr, &autocorr_direct, &croscorr_direct,nthreads);
     
     
     if(!strcmp("-",filename)) { out=stdout; } 
@@ -433,7 +433,7 @@ void compute_corr_ft(int nobj, int dim, int window, int nframes,  fftw_complex *
 }
 
 
-void do_back_fft(int nobj, int dim, int window, int nframes, int nfiles, double ** autocorr, double ** croscorr, double ** p_autocorr_direct, double ** p_croscorr_direct)
+void do_back_fft(int nobj, int dim, int window, int nframes, int nfiles, double ** autocorr, double ** croscorr, double ** p_autocorr_direct, double ** p_croscorr_direct, int nthreads)
 {
 /* This gives the autocorrelation function. A subsequent Laplace-FT will give the spectrum. */
 

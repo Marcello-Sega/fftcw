@@ -4,6 +4,8 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.6) 
 PROJECT (FFTCW C) 
 
+
+
 SET(MYPATHS      /usr/include 
                 $ENV{HOME}/include
                 /usr/local/include
@@ -23,11 +25,13 @@ ELSE(NOT FFTW_INC_DIR)
    STRING(REGEX REPLACE "/include" "/lib" FFTW_LIB_DIR "${FFTW_INC_DIR}")
    FIND_PATH(FFTW_THREADS NAMES libfftw3_threads.a PATHS ${FFTW_LIB_DIR})
    IF(NOT FFTW_THREADS)
-       SET(FFTW_LIBS fftw3)
+       SET(FFTW_LIBS fftw3a)
        MESSAGE(STATUS "Unable to find threaded fftw version  in ${FFTW_THREADS}")
    ELSE(NOT FFTW_THREADS)
        SET(FFTW_LIBS fftw3 fftw3_threads)
        MESSAGE(STATUS "Found threaded fftw version in ${FFTW_THREADS}")
+       ADD_DEFINITIONS( -D_USE_THREADS)
+
    ENDIF(NOT FFTW_THREADS) 
 ENDIF(NOT FFTW_INC_DIR) 
 
