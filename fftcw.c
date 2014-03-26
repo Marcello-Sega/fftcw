@@ -14,7 +14,7 @@ void usage (char*);
 void memusage(int amount,char* address,mem_operation op);
 void compute_corr_ft(int nobj, int dim, int window, int nframes, fftw_complex * out, double * autocorr, double * croscorr);
 int suck (int nobj, int dim, int maxframes,  double **buffer,FILE *cid);
-int do_fft(int nobj, int dim, int window, int nframes, int totframes, double ** buffer,double ** autocorr, double ** croscorr );
+int do_fft(int nobj, int dim, int window, int nframes, int totframes, double ** buffer,double ** autocorr, double ** croscorr, int nthreads );
 void do_spectrum(int nobj, int dim, int window, int nframes, int cut, double * in, fftw_complex ** out);
 void do_back_fft(int nobj, int dim, int window, int nframes, int nfiles, double ** autocorr, double ** croscorr, double ** p_autocorr_direct, double ** p_croscorr_direct);
 int output (int nobj, int window, int nframes, double dt, void * ac_dir, void * cc_dir, FILE*outfile, number_type type,int RSpaceOutputCut,int KSpaceOutputCut);
@@ -24,7 +24,7 @@ int main(int argc, char ** argv) {
     double * buffer=NULL;
     double timestep=1;
     char ch;
-    int dim=0,nobj=0,nframes=0,totframes,window=0,maxframes=0,cut=0;
+    int dim=0,nobj=0,nframes=0,totframes,window=0,maxframes=0,cut=0,nthreads=1;
     int i,j,k;
     double * autocorr, * autocorr_direct, * croscorr, * croscorr_direct;
     fftw_complex  * autocorr_spectrum=NULL, * croscorr_spectrum=NULL;
@@ -48,7 +48,7 @@ int main(int argc, char ** argv) {
 
     sprintf(filename,"-");
     i=j=k=0;
-    while ((ch = getopt (argc, argv, "n:d:f:o:w:m:t:c:T:x:R:F:")) != -1)
+    while ((ch = getopt (argc, argv, "n:d:f:o:w:m:t:c:T:x:R:F:C:")) != -1)
     {
         switch (ch)
         {
@@ -70,11 +70,26 @@ int main(int argc, char ** argv) {
              case 'c': cut= atoi(optarg);      break;
              case 'o': strncpy(filename,optarg,1024); break;
              case 't': timestep=atof(optarg); i++; break;
+             case 'C': nthreads=atoi(optarg); i++; break;
              case 'h': case '?': default: usage (argv[0]);
         }
     }
     if(i<3) usage(argv[0]);
     if(nfiles==0) { nfiles=1; sprintf(infilenames[0],"-"); }  
+    if(nthreads>1){
+#ifdef _USE_THREADS
+	fprintf(stderr,"Using %d threads\n",nthreads);
+#else
+	fprintf(stderr,"Threads support not compiled, using 1 thread\n");
+        nthreads=1;
+#endif
+    } else { 
+	exit(printf("Error: the number of threads must be >=1\n"));
+    }
+#ifdef _USE_THREADS
+    fftw_init_threads(void);
+#endif
+
     for(i=0;i<nfiles;i++){
          if(in!=NULL) {
               if(!strcmp(awkstring,"-")) {
@@ -132,7 +147,7 @@ int main(int argc, char ** argv) {
         if(nframes%2) nframes--;
         
         fprintf(stderr,"Performing fwd FFTs: nobj=%d dim=%d window=%d nframes=%d buffer=%p\n",nobj,dim,window,nframes,(void*)buffer);
-        do_fft(nobj,dim,window,nframes,totframes,&buffer,&autocorr,&croscorr); 
+        do_fft(nobj,dim,window,nframes,totframes,&buffer,&autocorr,&croscorr,nthreads); 
         free(buffer); buffer=NULL;
     }
     
@@ -179,7 +194,7 @@ int main(int argc, char ** argv) {
     return 1;
 } 
 
-void usage (char *arg){ exit(printf( "Usage : %s -t <timestep> -n <n_objects> -d <dimension>  [ -w <window> ] [ -f <nframes> ] [ -o <output> ] [ -m <maxframes> ] [ -c <spectrum_input_cut> ] [ -T <inputfile> [ <inputfile2> [...] ] ] [ -F <spectrum_output_cut> ] [ -R <correlation_output_cut> ] [ -h ]\nNote: you can supply a command through which to pipe your data before processing them using the EXT_COMM variable\n e.g. EXT_COMM=\"/usr/bin/awk \'{print \\$1}\'\"\n",arg  ));}
+void usage (char *arg){ exit(printf( "Usage : %s -t <timestep> -n <n_objects> -d <dimension>  [ -w <window> ] [ -f <nframes> ] [ -o <output> ] [ -m <maxframes> ] [ -c <spectrum_input_cut> ] [ -T <inputfile> [ <inputfile2> [...] ] ] [ -F <spectrum_output_cut> ] [ -R <correlation_output_cut> ] [ -C threads_number ] [ -h ]\nNote: you can supply a command through which to pipe your data before processing them using the EXT_COMM variable\n e.g. EXT_COMM=\"/usr/bin/awk \'{print \\$1}\'\"\n",arg  ));}
 
 void memusage(int amount,char * address,mem_operation op){
 #if DEBUG_LEVEL <=-1
@@ -276,7 +291,9 @@ void do_spectrum(int nobj, int dim, int window, int nframes, int cut, double * i
    *out = (fftw_complex*) fftw_malloc(fft_size);
    memusage(fft_size,(char*)(*out),MEM_ADD);
 
-   if(pfwd==NULL) pfwd = fftw_plan_many_dft_r2c(rank, n, howmany, in, n, howmany, 1 , *out, n, howmany , 1 , FFTW_ESTIMATE|FFTW_PRESERVE_INPUT);
+   if(pfwd==NULL){
+       pfwd = fftw_plan_many_dft_r2c(rank, n, howmany, in, n, howmany, 1 , *out, n, howmany , 1 , FFTW_ESTIMATE|FFTW_PRESERVE_INPUT);
+   }
    if (pfwd==NULL) exit(fprintf(stderr,"Something's wrong with planning fftw (line %d)\n",__LINE__));
 
    fftw_execute(pfwd);  
@@ -286,7 +303,7 @@ void do_spectrum(int nobj, int dim, int window, int nframes, int cut, double * i
    return ;
 }
 
-int do_fft(int nobj, int dim, int window, int nframes, int totframes, double ** buffer,double ** p_autocorr, double ** p_croscorr){
+int do_fft(int nobj, int dim, int window, int nframes, int totframes, double ** buffer,double ** p_autocorr, double ** p_croscorr,int nthreads){
 
     /* notation the same as in fftw3 manual, for clarity */
     int rank    = 1;    /* we are computing 1d transforms */
@@ -352,6 +369,9 @@ int do_fft(int nobj, int dim, int window, int nframes, int totframes, double ** 
     /* we need to use FFTW_ESTIMATE, as we are computing only one (or few) FFTs! */
     for(i=0;i<n[0]*howmany;i++) { out[i][0]=out[i][1]=1.0 ; } 
     if(pfwd==NULL){
+#ifdef _USE_THREADS
+        fftw_plan_with_nthreads(nthreads);
+#endif
          pfwd = fftw_plan_many_dft_r2c(rank, n, howmany, in, inembed, istride, idist, out, onembed, 
                                      ostride, odist, FFTW_ESTIMATE|FFTW_PRESERVE_INPUT);
             if (pfwd==NULL) exit(fprintf(stderr,"Something's wrong with planning fftw (line %d)\n",__LINE__));
@@ -457,8 +477,13 @@ void do_back_fft(int nobj, int dim, int window, int nframes, int nfiles, double 
     }
     * p_autocorr_direct = autocorr_direct;
 
-    if (pbckAuto==NULL) pbckAuto = fftw_plan_many_r2r(rank, n, howmany, *autocorr, inembed, istride, idist, autocorr_direct, 
+    if (pbckAuto==NULL){
+#ifdef _USE_THREADS
+            fftw_plan_with_nthreads(nthreads);
+#endif
+            pbckAuto = fftw_plan_many_r2r(rank, n, howmany, *autocorr, inembed, istride, idist, autocorr_direct, 
                                                       onembed, ostride, odist, kind, FFTW_ESTIMATE|FFTW_PRESERVE_INPUT);
+    }
     if (pbckAuto==NULL) exit(fprintf(stderr,"Something's wrong with planning fftw (line %d)\n",__LINE__));
 
     fftw_execute(pbckAuto);
@@ -492,8 +517,13 @@ void do_back_fft(int nobj, int dim, int window, int nframes, int nfiles, double 
     }
     * p_croscorr_direct = croscorr_direct;
 
-    if (pbckCros==NULL) pbckCros = fftw_plan_many_r2r(rank, n, howmany, *croscorr, inembed, istride, idist, croscorr_direct, 
+    if (pbckCros==NULL){
+#ifdef _USE_THREADS
+            fftw_plan_with_nthreads(nthreads);
+#endif
+            pbckCros = fftw_plan_many_r2r(rank, n, howmany, *croscorr, inembed, istride, idist, croscorr_direct, 
                            onembed, ostride, odist, kind, FFTW_ESTIMATE|FFTW_PRESERVE_INPUT);
+    }
     if (pbckCros==NULL) exit(fprintf(stderr,"Something's wrong with planning fftw (line %d)\n",__LINE__));
     fftw_execute(pbckCros);
     
