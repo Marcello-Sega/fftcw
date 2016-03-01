@@ -20,7 +20,7 @@ int main(int argc , char **argv)
 
      if(argc==1) exit(printf("Usage: %s dt [maxlines average stride ]\n",argv[0]));
      file=stdin;
-     dt = atof(argv[2]);
+     dt = atof(argv[1]);
      if(argc>=3)  lines=atoi(argv[2]);
      if(argc>=4)  average = atoi(argv[3]); 
      if(argc==5)  stride = atoi(argv[4]);
